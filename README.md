@@ -111,9 +111,9 @@ python -m pip install pgserver==0.1.4
 python scripts/check_local_postgres.py
 ```
 
-This creates and deletes its own temporary database. It checks actual query results, save/reopen behavior and denied database operations. It does **not** establish that Supabase Auth or the deployed website works. The local implementation checks passed **72 tests**, including answer draft persistence and backward compatibility. A local browser check with disposable PostgreSQL and simulated authentication also verified five different drafts (including blank and unfinished SQL), refresh/reopen, updating the same saved copy, and clearing private drafts on sign-out. This browser check does not replace the deployed Supabase login check. On October 20, 2026, the hosted verification also passed: the reader used the Session pooler with SSL, all 60 records were present, and all five reference result tables matched. The deployed browser checks also passed on October 20, 2026: sign-in, all five question results, saving a renamed quiz, refreshing and reopening it, and query/save restrictions before sign-in and after sign-out. Direct signed-out API requests returned HTTP 401 for both query and save.
+This creates and deletes its own temporary database. It checks actual query results, save/reopen behavior and denied database operations. It does **not** establish that Supabase Auth or the deployed website works. The local implementation checks passed **72 tests**, including answer draft persistence and backward compatibility. A local browser check with disposable PostgreSQL and simulated authentication also verified five different drafts (including blank and unfinished SQL), refresh/reopen, updating the same saved copy, and clearing private drafts on sign-out. This browser check does not replace the deployed Supabase login check. On October 20, 2026, the hosted verification also passed: the reader used the Session pooler with SSL, all 60 records were present, and all five reference result tables matched. The deployed browser checks also passed on October 20, 2026: sign-in, all five question results, saving a renamed quiz, refreshing and reopening it, and query/save restrictions before sign-in and after sign-out. Direct signed-out API requests returned HTTP 401 for both query and save. After deploying answer persistence, the signed-in website also passed the five-draft save/refresh/reopen check, retained blank and unfinished answers, updated the same saved copy, and reopened the earlier quiz with blank answers. The updated first answer ran successfully and returned the five expected rows.
 
-[The successful main-branch Actions run](https://github.com/whraw76/treasury-sql-quiz/actions/runs/39523835499) passed both `tests` and `hosted-postgres`. The hosted job used the `QUERY_DATABASE_URL` repository Secret to connect to Supabase and verify all five hints.
+[The successful main-branch Actions run](https://github.com/whraw76/treasury-sql-quiz/actions/runs/39532277061) passed both `tests` and `hosted-postgres`. The hosted job used the `QUERY_DATABASE_URL` repository Secret to connect to Supabase and verify all five hints.
 
 ## How the code fits together
 
@@ -140,7 +140,7 @@ The SQL playground supports the features used in the quiz, including filtering, 
 - [x] In a signed-out browser, confirm Run and Save require sign-in.
 - [x] Sign in, run each question, save a renamed quiz, reload, and reopen it.
 - [x] Verify SQL answer persistence, update and sign-out cleanup in the local browser.
-- [ ] Repeat the answer-save/refresh/reopen check on the updated deployed site.
+- [x] Repeat the answer-save/refresh/reopen check on the updated deployed site, including blank and unfinished answers, updating the same copy, and reopening an older saved quiz.
 - [x] Sign out and confirm Run and Save are blocked again.
 - [x] Check a successful main-branch Actions run with both jobs green and the hosted job's verification output.
 - [x] Confirm `.env` is ignored and no configured passwords or session secret appear in tracked files or Git history.
