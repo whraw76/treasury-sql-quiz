@@ -14,7 +14,7 @@ from dotenv import load_dotenv
 from flask import Flask, g, jsonify, render_template, request, session
 
 from auth import AuthError, SupabaseAuth
-from db import ConfigurationError, QueryRunner, QuizStore
+from db import AuditLog, ConfigurationError, QueryRunner, QuizStore
 from query_policy import MAX_SQL_LENGTH, QueryError, prepare_query
 
 ROOT = Path(__file__).resolve().parent
@@ -68,6 +68,7 @@ def create_app(test_config=None):
         AUTH=SupabaseAuth(os.getenv("SUPABASE_URL", ""), os.getenv("SUPABASE_KEY", "")),
         RUNNER=QueryRunner(os.getenv("QUERY_DATABASE_URL", "")),
         STORE=QuizStore(os.getenv("SAVE_DATABASE_URL", "")),
+        AUDIT=AuditLog(os.getenv("SAVE_DATABASE_URL", "")),
     )
     if test_config:
         app.config.update(test_config)
@@ -222,7 +223,20 @@ def create_app(test_config=None):
         body = request.get_json(silent=True)
         if not isinstance(body, dict):
             raise ValueError("Send a SQL query.")
-        return jsonify(app.config["RUNNER"].run(body.get("sql")))
+        sql_text = body.get("sql")
+        if not isinstance(sql_text, str) or not sql_text.strip() or len(sql_text) > MAX_SQL_LENGTH:
+            raise QueryError("Enter a SQL query of 1–8,000 characters.")
+        try:
+            result = app.config["RUNNER"].run(sql_text)
+        except (QueryError, ConfigurationError) as exc:
+            outcome = "rejected" if isinstance(exc, QueryError) else "failed"
+            app.config["AUDIT"].query(g.user["id"], sql_text, outcome, {"error_type": type(exc).__name__})
+            raise
+        # Return success only after the query has been recorded.
+        app.config["AUDIT"].query(g.user["id"], sql_text, "success", {
+            "returned_rows": len(result["rows"]), "truncated": result["truncated"],
+        })
+        return jsonify(result)
 
     @app.get("/api/quizzes")
     @require_user

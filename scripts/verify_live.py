@@ -12,6 +12,7 @@ from dotenv import load_dotenv
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 from db import QueryRunner, is_local_host, validate_database_url  # noqa: E402
+from audit_checks import verify_audit_permissions  # noqa: E402
 
 
 def verify(url, allow_local=False):
@@ -35,6 +36,8 @@ def verify(url, allow_local=False):
         count = conn.execute("SELECT COUNT(*) FROM quiz_data.yields").fetchone()[0]
         if count != 60:
             raise RuntimeError(f"Expected 60 yield records, found {count}.")
+        verify_audit_permissions(conn)
+    print("PASS: audit table exists; reader and writer cannot edit or delete its events.")
     quiz = json.loads((ROOT / "data/quiz.json").read_text())
     if sum(q["points"] for q in quiz["questions"]) != 20:
         raise RuntimeError("The quiz must total 20 points.")

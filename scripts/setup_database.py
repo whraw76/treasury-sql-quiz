@@ -25,6 +25,7 @@ def initialize(conn, reader_password, writer_password):
             "NOCREATEROLE NOINHERIT NOREPLICATION NOBYPASSRLS CONNECTION LIMIT 5"
         ).format(sql.Identifier(role), sql.Literal(password)))
     conn.execute((ROOT / "sql/schema.sql").read_text(), prepare=False)
+    conn.execute((ROOT / "sql/audit_log.sql").read_text(), prepare=False)
     conn.cursor().executemany(
         "INSERT INTO quiz_data.maturities(years, name) VALUES (%s, %s)",
         [(2, "2-year"), (10, "10-year"), (30, "30-year")],
@@ -93,7 +94,7 @@ def main():
     with os.fdopen(descriptor, "w") as file:
         file.write(contents)
     os.chmod(env_path, 0o600)
-    print("Created two restricted roles, three tables and 60 yield records.")
+    print("Created two restricted roles, four tables and 60 yield records.")
     print("Saved app credentials to ignored .env (owner-readable only). Admin credentials were not saved.")
     print("Next: python scripts/verify_live.py")
 

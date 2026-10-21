@@ -27,6 +27,8 @@ def main():
     server = pgserver.get_server(tempfile.mkdtemp(prefix="treasury-sql-pg-"), cleanup_mode="delete")
     try:
         admin_url = server.get_uri()
+        # Admin access is only for assertions in this disposable database.
+        os.environ["TEST_ADMIN_DATABASE_URL"] = admin_url
         passwords = {role: secrets.token_urlsafe(20) for role in ["treasury_reader", "treasury_writer"]}
         with psycopg.connect(admin_url) as conn:
             initialize(conn, passwords["treasury_reader"], passwords["treasury_writer"])

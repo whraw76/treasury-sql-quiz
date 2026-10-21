@@ -85,6 +85,30 @@ class QueryRunner:
             raise QueryError("PostgreSQL rejected the query. Check column names, types and grouping.") from exc
 
 
+def append_audit(conn, actor_id, action, outcome, details, sql_text=None, quiz_id=None):
+    # Bind values; PostgreSQL supplies the timestamp.
+    conn.execute(
+        """INSERT INTO quiz_audit.events
+           (id, actor_id, action, outcome, sql_text, quiz_id, details)
+           VALUES (%s, %s, %s, %s, %s, %s, %s)""",
+        (uuid4(), UUID(actor_id), action, outcome, sql_text, quiz_id, Jsonb(details)),
+    )
+
+
+class AuditLog:
+    def __init__(self, url):
+        self.url = url
+
+    def query(self, actor_id, sql_text, outcome, details):
+        validate_database_url(self.url, "treasury_writer")
+        try:
+            with psycopg.connect(self.url, connect_timeout=8) as conn:
+                conn.execute("SET LOCAL statement_timeout = '5s'")
+                append_audit(conn, actor_id, "query", outcome, details, sql_text=sql_text)
+        except psycopg.Error as exc:
+            raise ConfigurationError("The query could not be recorded. Please try again.") from exc
+
+
 class QuizStore:
     def __init__(self, url):
         self.url = url
@@ -107,8 +131,10 @@ class QuizStore:
                    RETURNING id""",
                 (quiz_id, owner_id, Jsonb(quiz)),
             ).fetchone()
-        if row is None:
-            raise PermissionError("This quiz belongs to another user.")
+            if row is None:
+                raise PermissionError("This quiz belongs to another user.")
+            # Commit the saved answers and their log together.
+            append_audit(conn, owner_id, "save", "success", {"quiz": quiz}, quiz_id=quiz_id)
         return str(row[0])
 
     def list(self, owner_id):

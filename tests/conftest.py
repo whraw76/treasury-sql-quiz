@@ -66,11 +66,21 @@ class FakeStore:
         return [{"id": key, "title": value[1]["title"]} for key, value in self.rows.items() if value[0] == owner]
 
 
+class FakeAudit:
+    def __init__(self):
+        self.events = []
+
+    def query(self, actor_id, sql_text, outcome, details):
+        self.events.append({"actor_id": actor_id, "sql_text": sql_text,
+                            "outcome": outcome, "details": copy.deepcopy(details)})
+
+
 @pytest.fixture
 def application(quiz):
     return create_app({
         "TESTING": True, "SECRET_KEY": "test-only-not-a-production-secret",
         "AUTH": FakeAuth(), "RUNNER": FakeRunner(quiz), "STORE": FakeStore(),
+        "AUDIT": FakeAudit(),
     })
 
 

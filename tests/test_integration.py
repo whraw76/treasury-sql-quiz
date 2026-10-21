@@ -7,7 +7,7 @@ import psycopg
 import pytest
 
 from app import create_app
-from db import QueryRunner, QuizStore
+from db import AuditLog, QueryRunner, QuizStore
 from scripts.verify_live import verify
 from tests.conftest import FakeAuth
 
@@ -77,6 +77,7 @@ def test_http_query_and_saved_quiz_use_postgres(database, quiz):
     application = create_app({
         "TESTING": True, "SECRET_KEY": "test-only-secret",
         "AUTH": FakeAuth(), "RUNNER": QueryRunner(database[0]), "STORE": QuizStore(database[1]),
+        "AUDIT": AuditLog(database[1]),
     })
     client = application.test_client()
     headers = {"X-CSRF-Token": client.get("/api/bootstrap").json["csrf_token"]}

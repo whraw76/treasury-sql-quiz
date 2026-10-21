@@ -1,4 +1,4 @@
-# Treasury SQL Lab
+# Treasury SQL Quiz
 
 A 20-point SQL quiz using a small sample of U.S. Treasury yields. Sign in, choose a question, write SQL, and compare the returned rows with the hint. The site uses Flask, Supabase Auth, and hosted PostgreSQL.
 
@@ -29,13 +29,13 @@ The [Federal Reserve GSW dataset](https://www.federalreserve.gov/data/nominal-yi
 
 1. Sign in with a Supabase email/password account configured for this project. For a new account, use **Create an account** and confirm the email when required.
 2. Pick a question, enter a single `SELECT` query, and click **Run query**.
-3. Open **View hint & expected result** to compare the rows. **Use this SQL** copies the example into the editor.
-4. Enter answers for any of the five questions and click **Save quiz**. This saves all five SQL drafts under your account, including blank or unfinished answers. You can give the attempt a different title.
-5. Reload the page and choose the saved quiz under **My saved quizzes**. Your answers reappear in their original questions. Edit an answer and save again to update that same copy. **Starter quiz** starts a new copy with blank answers.
+3. Open **Hint: SQL and expected result** to compare the rows. **Copy to editor** copies the example into the editor.
+4. Enter answers for any of the five questions and click **Save answers**. This saves all five SQL drafts under your account, including blank or unfinished answers. You can give the attempt a different title.
+5. Reload the page and choose the saved quiz under **My saved quizzes**. Your answers reappear in their original questions. Edit an answer and save again to update that same copy. **New copy** starts a new copy with blank answers.
 
-Optional: **Edit this question** changes a prompt and its reference SQL. Saving also refreshes the hints from the database. Your answer drafts are stored as text; only **Run query** executes a student answer. There is no automatic grading or auto-save.
+Optional: **Edit question** changes a prompt and its reference SQL. Saving also refreshes the hints from the database. Your answer drafts are stored as text; only **Run query** executes a student answer. There is no automatic grading or auto-save.
 
-Signed-out visitors can read questions and hints but cannot run SQL or save. **Save quiz stores the question set, hints and your five SQL answer drafts in PostgreSQL**. Unsaved edits are lost on refresh. Older saved quizzes open with blank answers because they did not store answer drafts. The starter quiz remains available to everyone. Saved copies are private to their owner.
+Signed-out visitors can read questions and hints but cannot run SQL or save. **Save answers stores the question set, hints and your five SQL answer drafts in PostgreSQL**. Unsaved edits are lost on refresh. Older saved quizzes open with blank answers because they did not store answer drafts. The starter quiz remains available to everyone. Saved copies are private to their owner.
 
 ## Run locally
 
@@ -92,7 +92,7 @@ In Render's Environment settings, enter `SUPABASE_URL`, `SUPABASE_KEY`, `QUERY_D
 
 **GitHub Actions:** in repository **Settings → Secrets and variables → Actions**, add a repository secret named `QUERY_DATABASE_URL` containing the reader connection value. Do not put the assignment, outer quotes, or password directly in the workflow YAML. [GitHub's Secrets guide](https://docs.github.com/en/actions/how-tos/write-workflows/choose-what-workflows-do/use-secrets) shows where to add it.
 
-[The workflow](.github/workflows/ci.yml) runs local tests, then connects to the hosted database using that Secret. The hosted job checks the restricted role, the record count, and all five reference results. Missing credentials or a failed connection cause a failure, not a skipped success. Push to `main` or use **Actions → SQL quiz checks → Run workflow**. Both jobs must be green; a pull-request run alone is insufficient because its hosted job is deliberately skipped.
+[The workflow](.github/workflows/ci.yml) runs local tests, then connects to the hosted database using that Secret. The hosted job checks the restricted role, the record count, all five reference results, and the audit table permissions. Missing credentials or a failed connection cause a failure, not a skipped success. Push to `main` or use **Actions → SQL quiz checks → Run workflow**. Both jobs must be green; a pull-request run alone is insufficient because its hosted job is deliberately skipped.
 
 ## Tests
 
@@ -113,7 +113,7 @@ python scripts/check_local_postgres.py
 
 This creates and deletes its own temporary database. It checks actual query results, save/reopen behavior and denied database operations. It does **not** establish that Supabase Auth or the deployed website works.
 
-The local implementation checks passed **82 tests**, including answer draft persistence, backward compatibility, and five alternative solutions that compare result values and ordering rather than SQL text or column aliases. A local browser check with disposable PostgreSQL and simulated authentication also verified five different drafts (including blank and unfinished SQL), refresh/reopen, updating the same saved copy, and clearing private drafts on sign-out. This browser check does not replace the deployed Supabase login check.
+The local implementation checks passed **101 tests**, including answer draft persistence, backward compatibility, and five alternative solutions that compare result values and ordering rather than SQL text or column aliases. A local browser check with disposable PostgreSQL and simulated authentication also verified five different drafts (including blank and unfinished SQL), refresh/reopen, updating the same saved copy, and clearing private drafts on sign-out. This browser check does not replace the deployed Supabase login check.
 
 On October 20, 2026, the hosted verification also passed: the reader used the Session pooler with SSL, all 60 records were present, and all five reference result tables matched. The deployed browser checks also passed on October 20, 2026: sign-in, all five question results, saving a renamed quiz, refreshing and reopening it, and query/save restrictions before sign-in and after sign-out. Direct signed-out API requests returned HTTP 401 for both query and save. After deploying answer persistence, the signed-in website also passed the five-draft save/refresh/reopen check, retained blank and unfinished answers, updated the same saved copy, and reopened the earlier quiz with blank answers. The updated first answer ran successfully and returned the five expected rows. A separate evaluator account also passed sign-in, query, save and refresh/reopen checks; its saved list did not show the original account's records. The final audit checked all five alternative solutions against hosted PostgreSQL, with matching row counts of 5, 10, 3, 3 and 10.
 
@@ -126,16 +126,52 @@ On October 20, 2026, the hosted verification also passed: the reader used the Se
 | `app.py` | Web routes; verifies the signed-in user before query/save; validates quiz input |
 | `auth.py` | Calls Supabase Auth to sign in and verify the access token |
 | `query_policy.py` | Parses one permitted SELECT and restricts tables, SQL features and result size |
-| `db.py` | Runs queries with the reader login; saves and retrieves owner-specific quizzes with the writer login |
+| `db.py` | Runs queries with the reader login; saves and retrieves owner-specific quizzes with the writer login; records audit events |
 | `templates/index.html`, `static/` | Quiz page, styling, question navigation and result-table display |
 | `data/` | The fixed sample, provenance and five questions with reference results |
-| `sql/schema.sql` | Tables and database grants |
+| `sql/schema.sql`, `sql/audit_log.sql` | Data tables, audit table and database grants |
+| `audit_checks.py`, `scripts/verify_audit.py` | Audit permission checks and actual denied-operation checks |
 | `scripts/` | One-time database setup and verification commands |
 | `tests/` | Unit checks and real PostgreSQL integration checks |
 
-A query follows `browser → Flask → verified Supabase user → read-only PostgreSQL connection → result table`. The reader cannot modify the sample or access saved quizzes. Save requests use a separate writer connection and bound SQL parameters, including an owner ID taken from the verified session. Ownership is enforced by the application's queries; this version does not claim row-level-security policies or an audit-log extra credit feature.
+A query follows `browser → Flask → verified Supabase user → read-only PostgreSQL connection → result table`. The reader cannot modify the sample or access saved quizzes. Save requests use a separate writer connection and bound SQL parameters, including an owner ID taken from the verified session. Saved-quiz ownership is enforced by the application's queries. The separate audit table has row-level security and an INSERT-only policy for the backend writer.
 
 The SQL playground supports the features used in the quiz, including filtering, joins, grouping, basic aggregates, CTEs, and `DATE '2025-01-02'` / `CAST(... AS DATE)` date expressions. Other cast types remain outside this small playground. It is not a general PostgreSQL console. Results are capped at 200 rows and statements at five seconds. Sessions require sign-in again when their token expires.
+
+## Audit log (extra credit)
+
+`quiz_audit.events` records the verified user's ID, a database timestamp and the operation:
+
+- **Query:** the submitted SQL, success/rejected/failed status, and returned row count for successful queries. Valid text rejected by the SQL policy is logged too.
+- **Save:** the quiz ID and a snapshot of the saved questions, hints and all five answers. A later save adds a new event without changing the earlier snapshot.
+
+The server supplies the user ID from Supabase Auth. Passwords and access tokens are not included. Only signed-in query requests with nonempty SQL of at most 8,000 characters are logged; malformed requests and login attempts are outside this log. It starts when this feature is deployed, without reconstructing earlier activity.
+
+The query reader cannot access the log. The backend writer can only insert event fields; PostgreSQL generates the timestamp. Both roles are denied SELECT, UPDATE, DELETE and TRUNCATE on the audit table. Row-level security allows only the writer to insert. The database owner can inspect the log and still administer the database; this is not protection against the owner.
+
+Saving a quiz and its audit event uses one transaction. If logging fails, the save rolls back. Query results are returned only after logging succeeds; a logging failure returns an error even if the read-only query already ran.
+
+For an existing project, run [sql/audit_log.sql](sql/audit_log.sql) once as the database owner in Supabase's SQL Editor **before deploying the updated app**. Fresh setup includes this migration. It preserves existing data and needs no new app credentials.
+
+Verify with the two existing connection settings in `.env`:
+
+```bash
+python scripts/verify_live.py
+python scripts/verify_audit.py
+```
+
+The second command actually attempts UPDATE, DELETE and TRUNCATE with both app roles and expects permission errors. Each attempt is rolled back, including if it unexpectedly succeeds. The ordinary Actions hosted job checks the effective audit grants using the existing reader Secret.
+
+To inspect recent records as the database owner in Supabase SQL Editor:
+
+```sql
+SELECT occurred_at, actor_id, action, outcome, sql_text, quiz_id, details
+FROM quiz_audit.events
+ORDER BY occurred_at DESC
+LIMIT 20;
+```
+
+The tests cover event identity, quoted SQL, saved snapshots, rejected queries, logging failures, save rollback, denied mutations and detection of an accidentally granted UPDATE permission. No audit records are exposed through the public quiz page.
 
 ## Verification checklist (October 20, 2026)
 
