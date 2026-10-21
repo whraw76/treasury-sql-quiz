@@ -1,5 +1,9 @@
 import copy
 
+import pytest
+
+from query_policy import MAX_SQL_LENGTH
+
 from tests.conftest import OWNER
 
 
@@ -60,6 +64,7 @@ def test_save_recomputes_hints_and_uses_verified_owner(signed_in, application, q
 
 def test_other_user_cannot_read_or_overwrite_saved_quiz(signed_in, quiz):
     client, headers = signed_in
+    quiz["answers"] = ["SELECT 60 -- private answer", "", "", "", ""]
     saved_id = client.post("/api/quizzes", headers=headers, json={"quiz": quiz}).json["id"]
     client.post("/api/auth/login", headers=headers, json={"email": "other@example.com", "password": "valid-password"})
     assert client.get(f"/api/quizzes/{saved_id}").status_code == 404
@@ -95,3 +100,65 @@ def test_json_errors_are_usable_and_responses_not_cached(signed_in):
     assert response.json["error"]
     assert response.headers["Cache-Control"] == "no-store"
     assert "frame-ancestors 'none'" in response.headers["Content-Security-Policy"]
+
+
+def test_all_five_answer_drafts_roundtrip_without_execution(signed_in, application, quiz):
+    client, headers = signed_in
+    answers = [
+        "SELECT date, yield_percent\nFROM yields;\n",
+        "SELECT -- unfinished",
+        "",  # An unanswered question is still saved in its original position.
+        "SELECT 'student''s note: 收益率';",
+        "DROP TABLE yields;",  # Stored as text only; never passed to the runner.
+    ]
+    quiz["answers"] = answers
+    response = client.post("/api/quizzes", headers=headers, json={"quiz": quiz})
+    assert response.status_code == 201
+    saved_id = response.json["id"]
+    assert response.json["quiz"]["answers"] == answers
+    assert client.get(f"/api/quizzes/{saved_id}").json["quiz"]["answers"] == answers
+    assert application.config["RUNNER"].calls == [q["reference_sql"] for q in quiz["questions"]]
+
+
+def test_resaving_updates_answers_without_creating_another_quiz(signed_in, quiz):
+    client, headers = signed_in
+    quiz["answers"] = ["SELECT", "", "", "", ""]
+    saved_id = client.post("/api/quizzes", headers=headers, json={"quiz": quiz}).json["id"]
+    quiz["answers"] = ["SELECT COUNT(*) FROM yields;", "", "", "", "SELECT 5;"]
+    updated = client.post("/api/quizzes", headers=headers, json={"id": saved_id, "quiz": quiz})
+    assert updated.status_code == 201
+    assert updated.json["id"] == saved_id
+    assert len(client.get("/api/quizzes").json["quizzes"]) == 1
+    assert client.get(f"/api/quizzes/{saved_id}").json["quiz"]["answers"] == quiz["answers"]
+
+
+@pytest.mark.parametrize("answers", [None, "SELECT 1", [], [""] * 4, [""] * 6,
+                                     [None] + [""] * 4, [7] + [""] * 4,
+                                     ["x" * (MAX_SQL_LENGTH + 1)] + [""] * 4])
+def test_invalid_answer_payload_is_rejected_before_running_or_saving(signed_in, application, quiz, answers):
+    client, headers = signed_in
+    quiz["answers"] = answers
+    response = client.post("/api/quizzes", headers=headers, json={"quiz": quiz})
+    assert response.status_code == 400
+    assert "answer" in response.json["error"].lower()
+    assert application.config["STORE"].rows == {}
+    assert application.config["RUNNER"].calls == []
+
+
+def test_legacy_saved_quiz_opens_with_five_blank_answers(signed_in, application, quiz):
+    client, _ = signed_in
+    saved_id = application.config["STORE"].save(OWNER, quiz)
+    reopened = client.get(f"/api/quizzes/{saved_id}")
+    assert reopened.status_code == 200
+    assert reopened.json["quiz"]["answers"] == [""] * 5
+    assert reopened.json["quiz"]["questions"] == quiz["questions"]
+
+
+def test_missing_answers_default_to_blank_and_length_boundary_is_allowed(signed_in, quiz):
+    client, headers = signed_in
+    saved = client.post("/api/quizzes", headers=headers, json={"quiz": quiz})
+    assert saved.json["quiz"]["answers"] == [""] * 5
+    quiz["answers"] = ["x" * MAX_SQL_LENGTH] + [""] * 4
+    boundary = client.post("/api/quizzes", headers=headers, json={"quiz": quiz})
+    assert boundary.status_code == 201
+    assert boundary.json["quiz"]["answers"] == quiz["answers"]

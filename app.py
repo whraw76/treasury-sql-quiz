@@ -15,7 +15,7 @@ from flask import Flask, g, jsonify, render_template, request, session
 
 from auth import AuthError, SupabaseAuth
 from db import ConfigurationError, QueryRunner, QuizStore
-from query_policy import QueryError, prepare_query
+from query_policy import MAX_SQL_LENGTH, QueryError, prepare_query
 
 ROOT = Path(__file__).resolve().parent
 
@@ -29,7 +29,13 @@ def validate_quiz(data):
         raise ValueError("Use a quiz title of 1–100 characters.")
     if not isinstance(questions, list) or len(questions) != 5:
         raise ValueError("This quiz must contain five questions.")
-    clean = {"title": title.strip(), "questions": []}
+    answers = data.get("answers", [""] * 5)
+    if not isinstance(answers, list) or len(answers) != 5:
+        raise ValueError("Include five SQL answer drafts, using empty text for unanswered questions.")
+    if any(not isinstance(answer, str) or len(answer) > MAX_SQL_LENGTH for answer in answers):
+        raise ValueError(f"Each SQL answer must be text of at most {MAX_SQL_LENGTH:,} characters.")
+    # Drafts may be incomplete or incorrect. Save them as text, without executing them.
+    clean = {"title": title.strip(), "questions": [], "answers": answers[:]}
     for number, question in enumerate(questions, 1):
         if not isinstance(question, dict):
             raise ValueError("Each question must contain a prompt and reference SQL.")
@@ -232,7 +238,7 @@ def create_app(test_config=None):
                 quiz_id = str(UUID(quiz_id))
             except (ValueError, TypeError, AttributeError) as exc:
                 raise ValueError("Invalid quiz identifier.") from exc
-        # Derive hints from real SQL results, never trust client-supplied answers.
+        # Derive hint results from reference SQL; student answer drafts are not executed.
         for question in quiz["questions"]:
             result = app.config["RUNNER"].run(question["reference_sql"])
             if result["truncated"]:
@@ -247,6 +253,8 @@ def create_app(test_config=None):
         quiz = app.config["STORE"].get(g.user["id"], str(quiz_id))
         if quiz is None:
             return jsonify(error="Quiz not found."), 404
+        # Saved quizzes from before answer persistence still open normally.
+        quiz.setdefault("answers", [""] * 5)
         return jsonify(id=str(quiz_id), quiz=quiz)
 
     return app

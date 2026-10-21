@@ -57,6 +57,7 @@ def test_save_reopen_update_and_other_owner_isolation(database, quiz):
     owner, other = str(uuid4()), str(uuid4())
     store = QuizStore(database[1])
     quiz["title"] = "Student's quiz'); DROP TABLE quiz_data.yields; --"
+    quiz["answers"] = ["SELECT COUNT(*) FROM yields;", "SELECT", "", "-- note\n", "DROP TABLE yields;"]
     quiz_id = store.save(owner, quiz)
     assert store.get(owner, quiz_id) == quiz
     assert store.list(owner)[0]["title"] == quiz["title"]
@@ -65,8 +66,9 @@ def test_save_reopen_update_and_other_owner_isolation(database, quiz):
     with pytest.raises(PermissionError):
         store.save(other, quiz, quiz_id)
     quiz["title"] = "Updated quiz"
+    quiz["answers"][1] = "SELECT date FROM yields;"
     assert store.save(owner, quiz, quiz_id) == quiz_id
-    assert store.get(owner, quiz_id)["title"] == "Updated quiz"
+    assert store.get(owner, quiz_id) == quiz
     assert QueryRunner(database[0]).run("SELECT COUNT(*) FROM yields")["rows"] == [[60]]
 
 
@@ -82,9 +84,12 @@ def test_http_query_and_saved_quiz_use_postgres(database, quiz):
     assert client.post("/api/auth/login", json={"email": "a@example.com", "password": "valid-password"}, headers=headers).status_code == 200
     result = client.post("/api/query", json={"sql": quiz["questions"][0]["reference_sql"]}, headers=headers)
     assert result.json == quiz["questions"][0]["expected"]
+    quiz["answers"] = ["SELECT COUNT(*) FROM yields;", "SELECT", "", "-- note\n", "DROP TABLE yields;"]
     saved = client.post("/api/quizzes", json={"quiz": quiz}, headers=headers)
     assert saved.status_code == 201
     reopened = client.get("/api/quizzes/" + saved.json["id"])
+    assert reopened.json["quiz"]["answers"] == quiz["answers"]
+    assert QueryRunner(database[0]).run("SELECT COUNT(*) FROM yields")["rows"] == [[60]]
     assert reopened.json["quiz"]["questions"][4]["expected"] == quiz["questions"][4]["expected"]
 
 

@@ -5,6 +5,15 @@ const topics = ["First observations", "Filter the yields", "Average by maturity"
 let csrf = "", quiz, starter, selected = 0, user = null, quizId = null;
 let drafts = ["", "", "", "", ""];
 let needsHintRefresh = new Set();
+let draftOwner = null, loadRequest = 0;
+
+function openQuiz(document, id = null) {
+  quiz = structuredClone(document); quizId = id; selected = 0;
+  drafts = [...(quiz.answers || ["", "", "", "", ""])];
+  needsHintRefresh.clear(); loadRequest += 1;
+  $("quiz-title").value = quiz.title; $("saved-quizzes").value = id || "";
+  renderQuestion();
+}
 
 function notice(message, error = false) {
   $("status").textContent = message;
@@ -99,7 +108,9 @@ function renderQuestion() {
 async function savedQuizzes() {
   $("saved-quizzes").replaceChildren(new Option("My saved quizzes", ""));
   if (!user) return;
+  const owner = user.id;
   const result = await api("/api/quizzes");
+  if (user?.id !== owner) return;
   result.quizzes.forEach((q) => $("saved-quizzes").add(new Option(q.title, q.id)));
   if (quizId) $("saved-quizzes").value = quizId;
 }
@@ -109,7 +120,8 @@ function openAuth() { $("auth-status").textContent = ""; $("auth-dialog").showMo
 $("account-button").addEventListener("click", async () => {
   if (!user) return openAuth();
   await busy($("account-button"), async () => {
-    await api("/api/auth/logout", "POST", {}); user = null; quizId = null;
+    await api("/api/auth/logout", "POST", {}); user = null; draftOwner = null;
+    openQuiz(starter);
     await savedQuizzes(); notice("Signed out. Run and Save now require sign-in.");
   });
   renderAccount();
@@ -120,7 +132,9 @@ $("auth-form").addEventListener("submit", async (event) => {
   await busy($("sign-in"), async () => {
     try {
       const result = await api("/api/auth/login", "POST", {email: $("email").value, password: $("password").value});
-      user = result.user; $("password").value = ""; $("auth-dialog").close(); renderAccount();
+      if (draftOwner && draftOwner !== result.user.id) openQuiz(starter);
+      user = result.user; draftOwner = user.id;
+      $("password").value = ""; $("auth-dialog").close(); renderAccount();
       notice(`Signed in as ${user.email}.`); await savedQuizzes();
     } catch (error) { $("auth-status").textContent = error.message; }
   });
@@ -134,6 +148,7 @@ $("sign-up").addEventListener("click", async () => {
     } catch (error) { $("auth-status").textContent = error.message; }
   });
 });
+$("sql-editor").addEventListener("input", () => { drafts[selected] = $("sql-editor").value; });
 $("run-query").addEventListener("click", async () => {
   if (!user) return openAuth();
   await busy($("run-query"), async () => {
@@ -155,24 +170,41 @@ $("save-quiz").addEventListener("click", async () => {
   if (!$("question-edit-panel").hidden) return notice("Apply or cancel the open question edits before saving.", true);
   await busy($("save-quiz"), async () => {
     drafts[selected] = $("sql-editor").value;
-    quiz.title = $("quiz-title").value;
-    const result = await api("/api/quizzes", "POST", {id: quizId, quiz});
-    quiz = result.quiz; quizId = result.id; needsHintRefresh.clear();
-    renderQuestion(); await savedQuizzes(); notice("Quiz saved to PostgreSQL. All five hint results were refreshed from the database.");
+    const currentQuiz = quiz, owner = user.id;
+    const snapshot = {...structuredClone(quiz), title: $("quiz-title").value, answers: [...drafts]};
+    const result = await api("/api/quizzes", "POST", {id: quizId, quiz: snapshot});
+    if (quiz !== currentQuiz || user?.id !== owner) return;
+    quizId = result.id;
+    // Do not overwrite text typed or question edits made while Save was running.
+    quiz.questions.forEach((question, index) => {
+      if (question.reference_sql === snapshot.questions[index].reference_sql) {
+        question.expected = result.quiz.questions[index].expected;
+        needsHintRefresh.delete(index);
+      }
+    });
+    if (!needsHintRefresh.has(selected)) table($("expected-result"), quiz.questions[selected].expected);
+    await savedQuizzes();
+    if (quiz !== currentQuiz || user?.id !== owner) return;
+    const changed = JSON.stringify(drafts) !== JSON.stringify(snapshot.answers)
+      || $("quiz-title").value !== snapshot.title
+      || quiz.questions.some((q, i) => q.prompt !== snapshot.questions[i].prompt
+        || q.reference_sql !== snapshot.questions[i].reference_sql);
+    notice(changed ? "Saved the answers from when you clicked Save. You have newer edits; save again to keep them."
+      : "Quiz and all five SQL answer drafts saved. Reopen them under My saved quizzes.");
   });
 });
 $("saved-quizzes").addEventListener("change", async () => {
   if (!$("saved-quizzes").value) return;
   try {
+    const owner = user?.id, requestNumber = ++loadRequest;
     const result = await api(`/api/quizzes/${encodeURIComponent($("saved-quizzes").value)}`);
-    quiz = result.quiz; quizId = result.id; selected = 0; drafts = ["", "", "", "", ""];
-    needsHintRefresh.clear(); $("quiz-title").value = quiz.title; renderQuestion(); notice("Opened your saved quiz.");
+    if (user?.id !== owner || requestNumber !== loadRequest) return;
+    openQuiz(result.quiz, result.id);
+    notice("Opened your saved quiz and SQL answers.");
   } catch (error) { notice(error.message, true); }
 });
 $("new-quiz").addEventListener("click", () => {
-  quiz = structuredClone(starter); quizId = null; selected = 0; drafts = ["", "", "", "", ""];
-  needsHintRefresh.clear(); $("quiz-title").value = quiz.title; $("saved-quizzes").value = "";
-  renderQuestion(); notice("Starter quiz loaded. Saving will create a new copy.");
+  openQuiz(starter); notice("Starter quiz loaded with blank answers. Saving will create a new copy.");
 });
 $("edit-question").addEventListener("click", () => {
   const q = quiz.questions[selected];
@@ -197,6 +229,6 @@ $("apply-question").addEventListener("click", () => {
     $("setup-notice").hidden = data.configured;
     renderQuestion();
     try { user = (await api("/api/me")).user; } catch { user = null; }
-    renderAccount(); await savedQuizzes();
+    draftOwner = user?.id || null; renderAccount(); await savedQuizzes();
   } catch (error) { notice(error.message, true); }
 })();

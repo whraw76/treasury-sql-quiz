@@ -30,10 +30,12 @@ The [Federal Reserve GSW dataset](https://www.federalreserve.gov/data/nominal-yi
 1. Sign in with a Supabase email/password account configured for this project. For a new account, use **Create an account** and confirm the email when required.
 2. Pick a question, enter a single `SELECT` query, and click **Run query**.
 3. Open **View hint & expected result** to compare the rows. **Use this SQL** copies the example into the editor.
-4. To make your own version, change the quiz title and optionally use **Edit this question** to change a prompt and its reference SQL. Click **Save quiz**. Saving runs the reference queries again and stores the whole quiz in PostgreSQL.
-5. Reload the page and select the saved quiz under **My saved quizzes** to reopen it.
+4. Enter answers for any of the five questions and click **Save quiz**. This saves all five SQL drafts under your account, including blank or unfinished answers. You can give the attempt a different title.
+5. Reload the page and choose the saved quiz under **My saved quizzes**. Your answers reappear in their original questions. Edit an answer and save again to update that same copy. **Starter quiz** starts a new copy with blank answers.
 
-Signed-out visitors can read questions and hints but cannot run SQL or save. SQL answer drafts stay in the current page only; **Save quiz saves the question set and hints, not answer submissions**. The starter quiz remains available to everyone. Saved copies are private to their owner.
+Optional: **Edit this question** changes a prompt and its reference SQL. Saving also refreshes the hints from the database. Your answer drafts are stored as text; only **Run query** executes a student answer. There is no automatic grading or auto-save.
+
+Signed-out visitors can read questions and hints but cannot run SQL or save. **Save quiz stores the question set, hints and your five SQL answer drafts in PostgreSQL**. Unsaved edits are lost on refresh. Older saved quizzes open with blank answers because they did not store answer drafts. The starter quiz remains available to everyone. Saved copies are private to their owner.
 
 ## Run locally
 
@@ -100,7 +102,7 @@ ruff check .
 python scripts/verify_live.py
 ```
 
-The first command checks authentication gates, expired sessions, ownership, parameter handling and the permitted SQL syntax using isolated test doubles. The last command requires the real hosted database and verifies its data and permissions.
+The first command checks authentication gates, expired sessions, ownership, parameter handling and the permitted SQL syntax using isolated test doubles. It also checks all five answer drafts, unfinished/blank answers, updates, invalid payloads and older saved quizzes. The last command requires the real hosted database and verifies its data and permissions.
 
 An optional local PostgreSQL check runs all tests against a disposable database:
 
@@ -109,7 +111,7 @@ python -m pip install pgserver==0.1.4
 python scripts/check_local_postgres.py
 ```
 
-This creates and deletes its own temporary database. It checks actual query results, save/reopen behavior and denied database operations. It does **not** establish that Supabase Auth or the deployed website works. The local implementation checks passed **60 tests**. On October 20, 2026, the hosted verification also passed: the reader used the Session pooler with SSL, all 60 records were present, and all five reference result tables matched. The deployed browser checks also passed on October 20, 2026: sign-in, all five question results, saving a renamed quiz, refreshing and reopening it, and query/save restrictions before sign-in and after sign-out. Direct signed-out API requests returned HTTP 401 for both query and save.
+This creates and deletes its own temporary database. It checks actual query results, save/reopen behavior and denied database operations. It does **not** establish that Supabase Auth or the deployed website works. The local implementation checks passed **72 tests**, including answer draft persistence and backward compatibility. A local browser check with disposable PostgreSQL and simulated authentication also verified five different drafts (including blank and unfinished SQL), refresh/reopen, updating the same saved copy, and clearing private drafts on sign-out. This browser check does not replace the deployed Supabase login check. On October 20, 2026, the hosted verification also passed: the reader used the Session pooler with SSL, all 60 records were present, and all five reference result tables matched. The deployed browser checks also passed on October 20, 2026: sign-in, all five question results, saving a renamed quiz, refreshing and reopening it, and query/save restrictions before sign-in and after sign-out. Direct signed-out API requests returned HTTP 401 for both query and save.
 
 [The successful main-branch Actions run](https://github.com/whraw76/treasury-sql-quiz/actions/runs/39523835499) passed both `tests` and `hosted-postgres`. The hosted job used the `QUERY_DATABASE_URL` repository Secret to connect to Supabase and verify all five hints.
 
@@ -137,6 +139,8 @@ The SQL playground supports the features used in the quiz, including filtering, 
 - [x] Confirm the hosted database contains the 60 records and all five hints match real query results.
 - [x] In a signed-out browser, confirm Run and Save require sign-in.
 - [x] Sign in, run each question, save a renamed quiz, reload, and reopen it.
+- [x] Verify SQL answer persistence, update and sign-out cleanup in the local browser.
+- [ ] Repeat the answer-save/refresh/reopen check on the updated deployed site.
 - [x] Sign out and confirm Run and Save are blocked again.
 - [x] Check a successful main-branch Actions run with both jobs green and the hosted job's verification output.
 - [x] Confirm `.env` is ignored and no configured passwords or session secret appear in tracked files or Git history.

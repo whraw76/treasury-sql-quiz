@@ -14,13 +14,14 @@
     <div id="setup-notice" class="notice" hidden>Local preview: connect Supabase before signing in, saving quizzes or running SQL. No simulated database results are returned.</div>
     <div id="status" class="notice" role="status" aria-live="polite" hidden></div>
     <section class="quiz-heading"><div><label for="quiz-title">QUIZ TITLE</label><input id="quiz-title" maxlength="100" aria-label="Quiz title" value="Treasury Yield SQL Quiz"></div><div class="heading-actions"><select id="saved-quizzes" aria-label="Open a saved quiz"><option value="">My saved quizzes</option></select><button id="new-quiz" class="quiet">Starter quiz</button><button id="save-quiz" class="secondary">Save quiz</button></div></section>
+    <p class="dataset-note">Save quiz keeps all five SQL answers, including unfinished drafts. Reopen them under My saved quizzes after refreshing.</p>
     <div class="workspace">
       <aside><nav id="questions" aria-label="Quiz questions"></nav><details class="schema" open><summary>Database schema</summary><p>Yields are in annual percent.<br><code>4.5</code> means <strong>4.5%</strong>.</p><h3>maturities</h3><code>years &nbsp; integer · primary key<br>name &nbsp;&nbsp; text</code><h3>yields</h3><code>date &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; date<br>maturity_years integer<br>yield_percent &nbsp;numeric(7,4)</code><p><code>yields.maturity_years</code> links to <code>maturities.years</code>.</p></details><p class="dataset-note">20 dates · 2023 &amp; 2025<br>2-, 10- and 30-year maturities</p></aside>
       <section class="question-panel">
         <div class="question-top"><span id="question-number" class="eyebrow">QUESTION 01</span><span class="points">4 points</span></div>
         <h2 id="question-title">Loading quiz…</h2><p id="question-prompt"></p>
         <div class="editor-heading"><label for="sql-editor">Your SQL</label><button id="edit-question" class="text-button">Edit this question</button></div>
-        <textarea id="sql-editor" spellcheck="false" aria-label="Your SQL query" placeholder="SELECT ...&#10;FROM yields;&#10;"></textarea>
+        <textarea id="sql-editor" maxlength="8000" spellcheck="false" aria-label="Your SQL query" placeholder="SELECT ...&#10;FROM yields;&#10;"></textarea>
         <div class="editor-footer"><span id="run-note">Sign in to run your query.</span><button id="run-query" class="primary">Run query <span aria-hidden="true">↗</span></button></div>
         <section class="result-section" aria-live="polite"><div class="result-heading"><h3>Query result</h3><span id="result-count"></span></div><div id="query-result" class="empty-result">Your result table will appear here.</div></section>
         <details id="hint-panel" class="hint"><summary>View hint &amp; expected result</summary><p>One possible solution is shown below. Other queries may be correct if they return the requested result.</p><pre id="reference-sql"></pre><button id="copy-hint" class="quiet">Use this SQL</button><div id="expected-result" class="table-wrap"></div></details>
