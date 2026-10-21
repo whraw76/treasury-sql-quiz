@@ -3,33 +3,96 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>Treasury SQL Lab</title>
+  <title>Treasury SQL Quiz</title>
   <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
   <script defer src="{{ url_for('static', filename='app.js') }}"></script>
 </head>
 <body>
-  <header class="topbar"><a class="brand" href="/">T<span>↗</span> Treasury SQL Lab</a><span class="course">IDS 706 · PostgreSQL practice</span><button id="account-button" class="quiet">Sign in</button></header>
+  <header class="topbar">
+    <a class="brand" href="/">Treasury SQL Quiz</a>
+    <span class="course">IDS 706</span>
+    <button id="account-button" class="quiet">Sign in</button>
+  </header>
   <main>
-    <section class="intro"><div><p class="eyebrow">READ THE DATA. WRITE THE QUERY.</p><h1>A small quiz.<br>A real yield curve.</h1><p>Explore U.S. Treasury yields with five SQL questions.<br>Run your queries against PostgreSQL and compare the result tables.</p></div><div class="facts"><div><strong>05</strong><span>questions</span></div><div><strong>20</strong><span>total points</span></div><div><strong>60</strong><span>yield records</span></div></div></section>
-    <div id="setup-notice" class="notice" hidden>Local preview: connect Supabase before signing in, saving quizzes or running SQL. No simulated database results are returned.</div>
+    <section class="intro">
+      <h1>SQL practice: Treasury yields</h1>
+      <p>5 questions · 4 points each · 20 points total. Write a query and compare your results with the hint.</p>
+    </section>
+    <div id="setup-notice" class="notice" hidden>Connect Supabase to enable sign-in, queries and saving.</div>
     <div id="status" class="notice" role="status" aria-live="polite" hidden></div>
-    <section class="quiz-heading"><div><label for="quiz-title">QUIZ TITLE</label><input id="quiz-title" maxlength="100" aria-label="Quiz title" value="Treasury Yield SQL Quiz"></div><div class="heading-actions"><select id="saved-quizzes" aria-label="Open a saved quiz"><option value="">My saved quizzes</option></select><button id="new-quiz" class="quiet">Starter quiz</button><button id="save-quiz" class="secondary">Save quiz</button></div></section>
-    <p class="dataset-note">Save quiz keeps all five SQL answers, including unfinished drafts. Reopen them under My saved quizzes after refreshing.</p>
+    <section class="quiz-heading" aria-label="Save and open answers">
+      <div class="quiz-name">
+        <label for="quiz-title">Saved copy name</label>
+        <input id="quiz-title" maxlength="100" value="Treasury Yield SQL Quiz">
+      </div>
+      <div class="heading-actions">
+        <select id="saved-quizzes" aria-label="Open a saved quiz"><option value="">My saved quizzes</option></select>
+        <button id="new-quiz" class="quiet">New copy</button>
+        <button id="save-quiz" class="secondary">Save answers</button>
+      </div>
+    </section>
+    <p class="save-note">Save answers keeps all five drafts. Use My saved quizzes to reopen them after refreshing.</p>
     <div class="workspace">
-      <aside><nav id="questions" aria-label="Quiz questions"></nav><details class="schema" open><summary>Database schema</summary><p>Yields are in annual percent.<br><code>4.5</code> means <strong>4.5%</strong>.</p><h3>maturities</h3><code>years &nbsp; integer · primary key<br>name &nbsp;&nbsp; text</code><h3>yields</h3><code>date &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; date<br>maturity_years integer<br>yield_percent &nbsp;numeric(7,4)</code><p><code>yields.maturity_years</code> links to <code>maturities.years</code>.</p></details><p class="dataset-note">20 dates · 2023 &amp; 2025<br>2-, 10- and 30-year maturities</p></aside>
-      <section class="question-panel">
-        <div class="question-top"><span id="question-number" class="eyebrow">QUESTION 01</span><span class="points">4 points</span></div>
-        <h2 id="question-title">Loading quiz…</h2><p id="question-prompt"></p>
-        <div class="editor-heading"><label for="sql-editor">Your SQL</label><button id="edit-question" class="text-button">Edit this question</button></div>
-        <textarea id="sql-editor" maxlength="8000" spellcheck="false" aria-label="Your SQL query" placeholder="SELECT ...&#10;FROM yields;&#10;"></textarea>
-        <div class="editor-footer"><span id="run-note">Sign in to run your query.</span><button id="run-query" class="primary">Run query <span aria-hidden="true">↗</span></button></div>
-        <section class="result-section" aria-live="polite"><div class="result-heading"><h3>Query result</h3><span id="result-count"></span></div><div id="query-result" class="empty-result">Your result table will appear here.</div></section>
-        <details id="hint-panel" class="hint"><summary>View hint &amp; expected result</summary><p>One possible solution is shown below. Other queries may be correct if they return the requested result.</p><pre id="reference-sql"></pre><button id="copy-hint" class="quiet">Use this SQL</button><div id="expected-result" class="table-wrap"></div></details>
-        <section id="question-edit-panel" class="edit-panel" hidden><h3>Edit the current question</h3><label for="edit-prompt">Question prompt</label><textarea id="edit-prompt" rows="3"></textarea><label for="edit-reference">Reference SQL</label><textarea id="edit-reference" rows="6" spellcheck="false"></textarea><p>Each question stays worth 4 points. Saving runs every reference query against the database and refreshes its expected result.</p><button id="apply-question" class="secondary">Apply edits</button><button id="cancel-edit" class="quiet">Cancel</button></section>
+      <aside>
+        <h2 class="sidebar-heading">Questions</h2>
+        <nav id="questions" aria-label="Quiz questions"></nav>
+        <details class="schema" open>
+          <summary>Database schema</summary>
+          <p>60 yield records from 20 dates in 2023 and 2025. Maturities: 2, 10 and 30 years.</p>
+          <h3>maturities</h3>
+          <dl class="column-list"><dt>years</dt><dd>integer, primary key</dd><dt>name</dt><dd>text</dd></dl>
+          <h3>yields</h3>
+          <dl class="column-list"><dt>date</dt><dd>date</dd><dt>maturity_years</dt><dd>integer</dd><dt>yield_percent</dt><dd>numeric(7,4)</dd></dl>
+          <p>Join <code>yields.maturity_years</code> to <code>maturities.years</code>.</p>
+          <p>Yields are in annual percent: <code>4.5</code> means <strong>4.5%</strong>.</p>
+        </details>
+      </aside>
+      <section class="question-panel" aria-label="Current question">
+        <div class="question-top"><span id="question-number">Question 1 of 5</span><span class="points">4 points</span></div>
+        <h2 id="question-title">Loading quiz…</h2>
+        <p id="question-prompt"></p>
+        <div class="editor-heading">
+          <label for="sql-editor">SQL answer</label>
+          <button id="edit-question" class="text-button">Edit question</button>
+        </div>
+        <textarea id="sql-editor" maxlength="8000" spellcheck="false" aria-label="Your SQL query" placeholder="SELECT ...&#10;FROM yields;"></textarea>
+        <div class="editor-footer"><span id="run-note">Sign in to run your query.</span><button id="run-query" class="primary">Run query</button></div>
+        <section class="result-section" aria-live="polite">
+          <div class="result-heading"><h3>Query result</h3><span id="result-count"></span></div>
+          <div id="query-result" class="empty-result">Run a query to see its rows here.</div>
+        </section>
+        <details id="hint-panel" class="hint">
+          <summary>Hint: SQL and expected result</summary>
+          <p>This is one possible solution. Other SQL is valid if it returns the requested result.</p>
+          <pre id="reference-sql"></pre>
+          <button id="copy-hint" class="quiet">Copy to editor</button>
+          <div id="expected-result" class="table-wrap"></div>
+        </details>
+        <section id="question-edit-panel" class="edit-panel" hidden>
+          <h3>Edit the current question</h3>
+          <label for="edit-prompt">Question prompt</label><textarea id="edit-prompt" rows="3"></textarea>
+          <label for="edit-reference">Reference SQL</label><textarea id="edit-reference" rows="6" spellcheck="false"></textarea>
+          <p>Each question is worth 4 points. Save answers runs the reference queries and updates the expected results.</p>
+          <button id="apply-question" class="secondary">Apply edits</button><button id="cancel-edit" class="quiet">Cancel</button>
+        </section>
       </section>
     </div>
-    <footer><span>Source: <a href="https://www.federalreserve.gov/data/nominal-yield-curve.htm" target="_blank" rel="noopener">Federal Reserve GSW estimates</a>. Fixed teaching sample; not live market prices.</span><span>Single SELECT queries · 200-row limit · 5-second timeout</span></footer>
+    <footer>
+      <span>Data: <a href="https://www.federalreserve.gov/data/nominal-yield-curve.htm" target="_blank" rel="noopener">Federal Reserve GSW estimates</a>. Fixed sample, not live market prices.</span>
+      <span>SELECT only · 200 rows maximum · 5-second timeout</span>
+    </footer>
   </main>
-  <dialog id="auth-dialog"><form id="auth-form"><button type="button" id="close-auth" class="close" aria-label="Close sign-in">×</button><p class="eyebrow">YOUR WORKSPACE</p><h2>Sign in to practice.</h2><p>Run SQL and save your own quiz. Accounts are managed by Supabase.</p><label for="email">Email</label><input id="email" name="email" type="email" autocomplete="username" required><label for="password">Password</label><input id="password" name="password" type="password" autocomplete="current-password" required><p id="auth-status" role="status"></p><button type="submit" id="sign-in" class="primary">Sign in</button><button type="button" id="sign-up" class="quiet">Create an account</button></form></dialog>
+  <dialog id="auth-dialog" aria-labelledby="auth-title">
+    <form id="auth-form">
+      <button type="button" id="close-auth" class="close" aria-label="Close sign-in">×</button>
+      <h2 id="auth-title">Sign in</h2>
+      <p>Sign in to run queries and save answers.</p>
+      <label for="email">Email</label><input id="email" name="email" type="email" autocomplete="username" required>
+      <label for="password">Password</label><input id="password" name="password" type="password" autocomplete="current-password" required>
+      <p id="auth-status" role="status"></p>
+      <button type="submit" id="sign-in" class="primary">Sign in</button>
+      <button type="button" id="sign-up" class="quiet">Create an account</button>
+    </form>
+  </dialog>
 </body>
 </html>

@@ -89,7 +89,7 @@ function renderQuestion() {
     });
     $("questions").append(button);
   });
-  $("question-number").textContent = `QUESTION ${String(selected + 1).padStart(2, "0")} / 05`;
+  $("question-number").textContent = `Question ${selected + 1} of 5`;
   $("question-title").textContent = topics[selected];
   $("question-prompt").textContent = q.prompt;
   $("sql-editor").value = drafts[selected];
@@ -97,7 +97,7 @@ function renderQuestion() {
   $("hint-panel").open = false;
   $("question-edit-panel").hidden = true;
   $("query-result").className = "empty-result";
-  $("query-result").textContent = "Your result table will appear here.";
+  $("query-result").textContent = "Run a query to see its rows here.";
   $("result-count").textContent = "";
   if (needsHintRefresh.has(selected)) {
     $("expected-result").className = "empty-result";
