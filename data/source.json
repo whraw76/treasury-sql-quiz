@@ -2,7 +2,7 @@
   "source_page": "https://www.federalreserve.gov/data/nominal-yield-curve.htm",
   "source_csv": "https://www.federalreserve.gov/data/yield-curve-tables/feds200628.csv",
   "parent_snapshot_sha256": "a9194d02971f04696e1be3a27ea2ae4d90c50a2833a69de100179e6c09f071d3",
-  "sample_sha256": "bf50c31c5de96a6e3b671499570f2a1f6747985d719522b3d0093c7a7bbd2b69",
+  "sample_sha256": "b7518040615e937162d56248a77432fd3c38a17f0bb908b1525542c9b7c4a29a",
   "selection": "First 10 non-missing dates in 2023 and in 2025; maturities 2, 10 and 30 years. No values filled or altered.",
   "dates": [
     "2023-01-03",
