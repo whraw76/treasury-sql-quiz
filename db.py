@@ -26,6 +26,7 @@ def validate_database_url(url, expected_role):
         params = conninfo_to_dict(url)
     except psycopg.Error as exc:
         raise ConfigurationError("Check the database connection settings.") from exc
+    # Supabase pooler usernames include a project suffix after the role name.
     role = params.get("user", "").split(".")[0]
     if role != expected_role:
         raise ConfigurationError(f"Use the dedicated {expected_role} database login.")
@@ -43,6 +44,7 @@ def validate_database_url(url, expected_role):
 
 
 def json_value(value):
+    # Convert PostgreSQL values into types the browser can receive as JSON.
     if isinstance(value, (date, datetime)):
         return value.isoformat()
     if isinstance(value, Decimal):
@@ -61,11 +63,13 @@ class QueryRunner:
         validate_database_url(self.url, "treasury_reader")
         try:
             with psycopg.connect(self.url, connect_timeout=8) as conn:
+                # Restrict each query to reading, with a short execution timeout.
                 conn.execute("SET TRANSACTION READ ONLY")
                 conn.execute("SET LOCAL statement_timeout = '5s'")
                 conn.execute("SET LOCAL lock_timeout = '1s'")
                 conn.execute("SET LOCAL search_path = pg_catalog, quiz_data")
                 cursor = conn.execute(query, prepare=False)
+                # Fetch one extra row to detect results larger than the display limit.
                 rows = cursor.fetchmany(MAX_ROWS + 1)
                 return {
                     "columns": [column.name for column in cursor.description],
@@ -108,6 +112,7 @@ class QuizStore:
         return str(row[0])
 
     def list(self, owner_id):
+        # Only list quizzes belonging to the signed-in user.
         with self._connect() as conn:
             rows = conn.execute(
                 """SELECT id, document->>'title', updated_at
@@ -117,6 +122,7 @@ class QuizStore:
         return [{"id": str(r[0]), "title": r[1], "updated_at": r[2].isoformat()} for r in rows]
 
     def get(self, owner_id, quiz_id):
+        # Knowing a quiz ID alone does not give access to another user's saved work.
         quiz_id = str(UUID(quiz_id))
         with self._connect() as conn:
             row = conn.execute(

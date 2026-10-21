@@ -38,6 +38,7 @@ def verify(url, allow_local=False):
     quiz = json.loads((ROOT / "data/quiz.json").read_text())
     if sum(q["points"] for q in quiz["questions"]) != 20:
         raise RuntimeError("The quiz must total 20 points.")
+    # Compare each documented hint with rows returned by the actual database.
     runner = QueryRunner(url)
     for q in quiz["questions"]:
         actual = runner.run(q["reference_sql"])

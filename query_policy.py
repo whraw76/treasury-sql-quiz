@@ -31,6 +31,7 @@ def prepare_query(sql_text):
     if len(sql_text) > MAX_SQL_LENGTH:
         raise QueryError("Keep the query under 8,000 characters.")
     try:
+        # Parse SQL into a syntax tree so checks examine its structure.
         statements = [s for s in sqlglot.parse(sql_text, read="postgres") if s]
     except (ParseError, RecursionError) as exc:
         raise QueryError("The SQL could not be parsed. Check its syntax.") from exc
@@ -56,6 +57,7 @@ def prepare_query(sql_text):
             continue
         if table.name not in {"yields", "maturities"}:
             raise QueryError("Use the yields and maturities tables shown in the schema.")
+        # Resolve allowed dataset tables explicitly to the quiz_data schema.
         table.set("db", exp.to_identifier("quiz_data"))
     for limit in tree.find_all(exp.Limit):
         value = limit.expression
@@ -65,6 +67,7 @@ def prepare_query(sql_text):
         value = offset.expression
         if not isinstance(value, exp.Literal) or value.is_string or not value.this.isdigit():
             raise QueryError("OFFSET must be a nonnegative whole number.")
+    # Keep one extra row so QueryRunner can flag a truncated result.
     limit = tree.args.get("limit")
     if limit is None or int(limit.expression.this) > MAX_ROWS + 1:
         tree = tree.limit(MAX_ROWS + 1)

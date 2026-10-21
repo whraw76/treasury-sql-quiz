@@ -29,6 +29,7 @@ def validate_quiz(data):
         raise ValueError("Use a quiz title of 1–100 characters.")
     if not isinstance(questions, list) or len(questions) != 5:
         raise ValueError("This quiz must contain five questions.")
+    # Keep one draft per question; unanswered questions use empty strings.
     answers = data.get("answers", [""] * 5)
     if not isinstance(answers, list) or len(answers) != 5:
         raise ValueError("Include five SQL answer drafts, using empty text for unanswered questions.")
@@ -53,6 +54,7 @@ def validate_quiz(data):
 
 
 def create_app(test_config=None):
+    # Local runs use .env; existing deployment environment variables take priority.
     load_dotenv(ROOT / ".env", override=False)
     app = Flask(__name__)
     production = os.getenv("APP_ENV") == "production"
@@ -79,6 +81,7 @@ def create_app(test_config=None):
             if not token:
                 return jsonify(error="Sign in to run SQL or save a quiz."), 401
             try:
+                # Check the token with Supabase before allowing a protected request.
                 g.user = app.config["AUTH"].user(token)
             except AuthError as exc:
                 if exc.status == 401:
@@ -89,6 +92,7 @@ def create_app(test_config=None):
 
     @app.before_request
     def csrf_check():
+        # Check a session token to help block requests sent by another website.
         if request.method in {"POST", "PUT", "PATCH", "DELETE"}:
             expected = session.get("csrf_token", "")
             supplied = request.headers.get("X-CSRF-Token", "")
@@ -244,6 +248,7 @@ def create_app(test_config=None):
             if result["truncated"]:
                 raise ValueError("A reference answer exceeds 200 rows. Narrow the question.")
             question["expected"] = result
+        # Use the verified user ID, rather than an owner ID sent by the browser.
         quiz_id = app.config["STORE"].save(g.user["id"], quiz, quiz_id)
         return jsonify(id=quiz_id, quiz=quiz), 201
 

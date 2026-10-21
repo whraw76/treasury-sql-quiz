@@ -20,6 +20,7 @@ class SupabaseAuth:
         if not self.url or not self.key:
             raise AuthError("Sign-in is not configured yet.", 503)
         headers = {"apikey": self.key}
+        # The API key identifies the project; the access token identifies the user.
         if token:
             headers["Authorization"] = f"Bearer {token}"
         try:
@@ -46,6 +47,7 @@ class SupabaseAuth:
         return self._request("POST", "signup", body={"email": email, "password": password})
 
     def user(self, token):
+        # Ask Supabase to validate the token and return the account identity.
         data = self._request("GET", "user", token=token)
         try:
             user_id = str(UUID(data["id"]))
