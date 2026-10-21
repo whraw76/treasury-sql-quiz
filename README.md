@@ -2,7 +2,11 @@
 
 A 20-point SQL quiz using a small sample of U.S. Treasury yields. Sign in, choose a question, write SQL, and compare the returned rows with the hint. The site uses Flask, Supabase Auth, and hosted PostgreSQL.
 
-**Quiz site URL: pending deployment.** This local version is not submission-ready until the hosted checks below are complete.
+**Quiz site:** https://treasury-sql-quiz.onrender.com/
+
+[![SQL quiz checks](https://github.com/whraw76/treasury-sql-quiz/actions/workflows/ci.yml/badge.svg)](https://github.com/whraw76/treasury-sql-quiz/actions/workflows/ci.yml)
+
+The site runs on Render's free plan. After inactivity, the first visit can take about a minute to wake up. To test query/save, use a confirmed quiz account supplied privately by the repository owner. The account is separate from the Supabase dashboard login; passwords are not published here.
 
 ## The quiz and data
 
@@ -70,7 +74,19 @@ Supabase's [default email service](https://supabase.com/docs/guides/auth/auth-sm
 
 Push this project to a GitHub repository, keeping `.env` and `.venv` excluded.
 
-**Render:** create a Blueprint from this repository using [render.yaml](render.yaml). The configuration installs the Python dependencies and serves Flask with Gunicorn. Set `SUPABASE_URL`, `SUPABASE_KEY`, `QUERY_DATABASE_URL`, and `SAVE_DATABASE_URL` using the values in the local `.env` file, without its surrounding double quotes. The Blueprint generates a separate `SECRET_KEY` and sets `APP_ENV=production`. After deployment, add the actual HTTPS URL to this README and to Supabase Auth's URL configuration. [Render's Flask guide](https://render.com/docs/deploy-flask) explains the hosting setup.
+**Render:** this deployment uses a free Python Web Service connected to this public repository, on branch `main` in Virginia. Use these settings:
+
+| Setting | Value |
+| --- | --- |
+| Build command | `pip install -r requirements.txt` |
+| Start command | `gunicorn --workers 2 --threads 4 --timeout 60 --bind 0.0.0.0:$PORT app:app` |
+| Health check | `/health` |
+| `PYTHON_VERSION` | `3.12.15` |
+| `APP_ENV` | `production` |
+
+In Render's Environment settings, enter `SUPABASE_URL`, `SUPABASE_KEY`, `QUERY_DATABASE_URL`, `SAVE_DATABASE_URL`, and `SECRET_KEY` from the local `.env`, without the outer double quotes. These settings stay outside Git. Set Supabase Auth's **Site URL** to the deployed HTTPS address. The `/health` endpoint checks the web process; database access is checked separately by the workflow and by running quiz questions.
+
+[render.yaml](render.yaml) also provides an equivalent Blueprint configuration, which generates its own session secret. If using a public repository without automatic deploys, use **Manual Deploy → Deploy latest commit** after code changes. [Render's Flask guide](https://render.com/docs/deploy-flask) explains the hosting setup.
 
 **GitHub Actions:** in repository **Settings → Secrets and variables → Actions**, add a repository secret named `QUERY_DATABASE_URL` containing the reader connection value. Do not put the assignment, outer quotes, or password directly in the workflow YAML. [GitHub's Secrets guide](https://docs.github.com/en/actions/how-tos/write-workflows/choose-what-workflows-do/use-secrets) shows where to add it.
 
@@ -93,7 +109,9 @@ python -m pip install pgserver==0.1.4
 python scripts/check_local_postgres.py
 ```
 
-This creates and deletes its own temporary database. It checks actual query results, save/reopen behavior and denied database operations. It does **not** establish that Supabase Auth or the deployed website works. The local implementation checks passed **60 tests**. On October 20, 2026, the hosted verification also passed: the reader used the Session pooler with SSL, all 60 records were present, and all five reference result tables matched. Deployed browser sign-in and GitHub Actions still need verification.
+This creates and deletes its own temporary database. It checks actual query results, save/reopen behavior and denied database operations. It does **not** establish that Supabase Auth or the deployed website works. The local implementation checks passed **60 tests**. On October 20, 2026, the hosted verification also passed: the reader used the Session pooler with SSL, all 60 records were present, and all five reference result tables matched. The deployed browser checks also passed on October 20, 2026: sign-in, all five question results, saving a renamed quiz, refreshing and reopening it, and query/save restrictions before sign-in and after sign-out. Direct signed-out API requests returned HTTP 401 for both query and save.
+
+[The successful main-branch Actions run](https://github.com/whraw76/treasury-sql-quiz/actions/runs/39523835499) passed both `tests` and `hosted-postgres`. The hosted job used the `QUERY_DATABASE_URL` repository Secret to connect to Supabase and verify all five hints.
 
 ## How the code fits together
 
@@ -113,12 +131,14 @@ A query follows `browser → Flask → verified Supabase user → read-only Post
 
 The SQL playground supports the features used in the quiz, including filtering, joins, grouping and basic aggregates. It is not a general PostgreSQL console. Results are capped at 200 rows and statements at five seconds. Sessions require sign-in again when their token expires.
 
-## Before submission
+## Verification checklist (October 20, 2026)
 
-- [ ] Put the actual deployed quiz URL near the top of this README.
+- [x] Put the actual deployed quiz URL near the top of this README.
 - [x] Confirm the hosted database contains the 60 records and all five hints match real query results.
-- [ ] In a signed-out browser, confirm Run and Save require sign-in.
-- [ ] Sign in, run each question, save an edited quiz, reload, and reopen it.
-- [ ] Sign out and confirm Run and Save are blocked again.
-- [ ] Check a successful main-branch Actions run with both jobs green and the hosted job's verification output.
-- [ ] Confirm no credentials were committed, then submit the GitHub repository URL.
+- [x] In a signed-out browser, confirm Run and Save require sign-in.
+- [x] Sign in, run each question, save a renamed quiz, reload, and reopen it.
+- [x] Sign out and confirm Run and Save are blocked again.
+- [x] Check a successful main-branch Actions run with both jobs green and the hosted job's verification output.
+- [x] Confirm `.env` is ignored and no configured passwords or session secret appear in tracked files or Git history.
+
+Submit this repository URL: https://github.com/whraw76/treasury-sql-quiz. Give the evaluator a confirmed quiz login privately so they can run and save; do not add its password to Git.
