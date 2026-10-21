@@ -6,7 +6,7 @@ A 20-point SQL quiz using a small sample of U.S. Treasury yields. Sign in, choos
 
 [![SQL quiz checks](https://github.com/whraw76/treasury-sql-quiz/actions/workflows/ci.yml/badge.svg)](https://github.com/whraw76/treasury-sql-quiz/actions/workflows/ci.yml)
 
-The site runs on Render's free plan. After inactivity, the first visit can take about a minute to wake up. To test query/save, use a confirmed quiz account supplied privately by the repository owner. The account is separate from the Supabase dashboard login; passwords are not published here.
+The site runs on Render's free plan. After inactivity, the first visit can take about a minute to wake up. **For the evaluator:** sign in as `admin@admin.com` with the password supplied privately in the Canvas submission comment. This is a regular quiz account, not a Supabase administrator. It can run SQL and save its own answers. Passwords are not published in this repository.
 
 ## The quiz and data
 
@@ -111,7 +111,11 @@ python -m pip install pgserver==0.1.4
 python scripts/check_local_postgres.py
 ```
 
-This creates and deletes its own temporary database. It checks actual query results, save/reopen behavior and denied database operations. It does **not** establish that Supabase Auth or the deployed website works. The local implementation checks passed **72 tests**, including answer draft persistence and backward compatibility. A local browser check with disposable PostgreSQL and simulated authentication also verified five different drafts (including blank and unfinished SQL), refresh/reopen, updating the same saved copy, and clearing private drafts on sign-out. This browser check does not replace the deployed Supabase login check. On October 20, 2026, the hosted verification also passed: the reader used the Session pooler with SSL, all 60 records were present, and all five reference result tables matched. The deployed browser checks also passed on October 20, 2026: sign-in, all five question results, saving a renamed quiz, refreshing and reopening it, and query/save restrictions before sign-in and after sign-out. Direct signed-out API requests returned HTTP 401 for both query and save. After deploying answer persistence, the signed-in website also passed the five-draft save/refresh/reopen check, retained blank and unfinished answers, updated the same saved copy, and reopened the earlier quiz with blank answers. The updated first answer ran successfully and returned the five expected rows.
+This creates and deletes its own temporary database. It checks actual query results, save/reopen behavior and denied database operations. It does **not** establish that Supabase Auth or the deployed website works.
+
+The local implementation checks passed **82 tests**, including answer draft persistence, backward compatibility, and five alternative solutions that compare result values and ordering rather than SQL text or column aliases. A local browser check with disposable PostgreSQL and simulated authentication also verified five different drafts (including blank and unfinished SQL), refresh/reopen, updating the same saved copy, and clearing private drafts on sign-out. This browser check does not replace the deployed Supabase login check.
+
+On October 20, 2026, the hosted verification also passed: the reader used the Session pooler with SSL, all 60 records were present, and all five reference result tables matched. The deployed browser checks also passed on October 20, 2026: sign-in, all five question results, saving a renamed quiz, refreshing and reopening it, and query/save restrictions before sign-in and after sign-out. Direct signed-out API requests returned HTTP 401 for both query and save. After deploying answer persistence, the signed-in website also passed the five-draft save/refresh/reopen check, retained blank and unfinished answers, updated the same saved copy, and reopened the earlier quiz with blank answers. The updated first answer ran successfully and returned the five expected rows. A separate evaluator account also passed sign-in, query, save and refresh/reopen checks; its saved list did not show the original account's records. The final audit checked all five alternative solutions against hosted PostgreSQL, with matching row counts of 5, 10, 3, 3 and 10.
 
 [The successful main-branch Actions run](https://github.com/whraw76/treasury-sql-quiz/actions/runs/39532277061) passed both `tests` and `hosted-postgres`. The hosted job used the `QUERY_DATABASE_URL` repository Secret to connect to Supabase and verify all five hints.
 
@@ -131,12 +135,13 @@ This creates and deletes its own temporary database. It checks actual query resu
 
 A query follows `browser → Flask → verified Supabase user → read-only PostgreSQL connection → result table`. The reader cannot modify the sample or access saved quizzes. Save requests use a separate writer connection and bound SQL parameters, including an owner ID taken from the verified session. Ownership is enforced by the application's queries; this version does not claim row-level-security policies or an audit-log extra credit feature.
 
-The SQL playground supports the features used in the quiz, including filtering, joins, grouping and basic aggregates. It is not a general PostgreSQL console. Results are capped at 200 rows and statements at five seconds. Sessions require sign-in again when their token expires.
+The SQL playground supports the features used in the quiz, including filtering, joins, grouping, basic aggregates, CTEs, and `DATE '2025-01-02'` / `CAST(... AS DATE)` date expressions. Other cast types remain outside this small playground. It is not a general PostgreSQL console. Results are capped at 200 rows and statements at five seconds. Sessions require sign-in again when their token expires.
 
 ## Verification checklist (October 20, 2026)
 
 - [x] Put the actual deployed quiz URL near the top of this README.
 - [x] Confirm the hosted database contains the 60 records and all five hints match real query results.
+- [x] Check a differently written solution for every question, including different aliases and explicit dates.
 - [x] In a signed-out browser, confirm Run and Save require sign-in.
 - [x] Sign in, run each question, save a renamed quiz, reload, and reopen it.
 - [x] Verify SQL answer persistence, update and sign-out cleanup in the local browser.

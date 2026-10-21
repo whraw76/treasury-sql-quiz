@@ -14,6 +14,8 @@ from query_policy import QueryError, prepare_query
     "WITH x AS (DELETE FROM yields RETURNING *) SELECT * FROM x",
     "SELECT current_setting('application_name')", "SELECT * FROM yields LIMIT -1",
     "SELECT * FROM yields LIMIT ALL", "", None,
+    "SELECT 'quiz_app.quizzes'::regclass", "SELECT CAST('x' AS public.custom_type)",
+    "SELECT CAST('x' AS TEXT)",
 ])
 def test_unsafe_or_out_of_scope_sql_is_rejected(sql):
     with pytest.raises(QueryError):
@@ -26,6 +28,8 @@ def test_unsafe_or_out_of_scope_sql_is_rejected(sql):
     "SELECT * FROM yields WHERE yield_percent BETWEEN 3 AND 5 ORDER BY date",
     "WITH recent AS (SELECT * FROM yields WHERE date > '2024-01-01') SELECT * FROM recent",
     "SELECT * FROM yields WHERE maturity_years IN (2,10)",
+    "SELECT * FROM yields WHERE date = DATE '2025-01-02'",
+    "SELECT * FROM yields WHERE date = CAST('2025-01-02' AS DATE)",
     "SELECT * FROM yields WHERE yield_percent > (SELECT AVG(yield_percent) FROM yields)",
     "SELECT 'DROP TABLE yields' AS harmless_text",
     "SELECT * FROM yields -- DELETE is only a comment\nLIMIT 3",

@@ -17,6 +17,7 @@ ALLOWED_NODES = {
     "Null", "Boolean", "Add", "Sub", "Mul", "Div", "Mod", "Distinct",
     "Count", "Avg", "Sum", "Min", "Max", "Round", "Abs", "Coalesce",
     "Nullif", "Case", "If", "Like", "ILike", "Subquery", "With", "CTE",
+    "Cast", "DataType",
 }
 
 
@@ -41,6 +42,10 @@ def prepare_query(sql_text):
         raise QueryError("This query is too complex for the small practice dataset.")
     if any(type(node).__name__ not in ALLOWED_NODES for node in nodes):
         raise QueryError("Use SELECT, filters, joins, grouping and basic aggregates only.")
+    # PostgreSQL DATE literals parse as casts. Other types remain out of scope.
+    for data_type in tree.find_all(exp.DataType):
+        if data_type.this != exp.DataType.Type.DATE:
+            raise QueryError("This quiz supports DATE casts only.")
     cte_names = {cte.alias for cte in tree.find_all(exp.CTE)}
     if cte_names & {"yields", "maturities"}:
         raise QueryError("CTE names must differ from the two dataset table names.")

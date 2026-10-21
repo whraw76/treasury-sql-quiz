@@ -95,3 +95,39 @@ def test_http_query_and_saved_quiz_use_postgres(database, quiz):
 
 def test_live_verifier_checks_data_and_grants(database):
     verify(database[0], allow_local=True)
+
+
+# Independently written alternatives: compare values/order, not SQL spelling or aliases.
+ALTERNATIVE_QUERIES = [
+    """SELECT date AS observation_date, yield_percent AS rate
+       FROM yields
+       WHERE maturity_years IN (10)
+         AND date BETWEEN DATE '2023-01-01' AND DATE '2023-12-31'
+       ORDER BY date LIMIT 5""",
+    """SELECT date AS observation_date, yield_percent AS rate
+       FROM yields WHERE NOT (yield_percent < 4.5) AND maturity_years = 10
+       ORDER BY 2 DESC, 1""",
+    """SELECT maturity_years AS years,
+              ROUND(SUM(yield_percent) / COUNT(*), 3) AS mean_yield
+       FROM yields GROUP BY 1 ORDER BY 1""",
+    """SELECT m.name AS maturity, y.date AS observation_date, y.yield_percent AS rate
+       FROM maturities m INNER JOIN yields y ON m.years = y.maturity_years
+       WHERE y.date = CAST('2025-01-02' AS DATE) ORDER BY y.maturity_years""",
+    """WITH spreads AS (
+         SELECT date,
+           MAX(CASE WHEN maturity_years = 10 THEN yield_percent END)
+             - MAX(CASE WHEN maturity_years = 2 THEN yield_percent END) AS gap
+         FROM yields WHERE maturity_years IN (2, 10) GROUP BY date
+       )
+       SELECT date AS observation_date, ROUND(gap, 4) AS difference
+       FROM spreads WHERE gap < 0 ORDER BY date""",
+]
+
+
+@pytest.mark.parametrize("question_index", range(5))
+def test_different_answers_match_each_question_by_result(database, quiz, question_index):
+    actual = QueryRunner(database[0]).run(ALTERNATIVE_QUERIES[question_index])
+    expected = quiz["questions"][question_index]["expected"]
+    assert len(actual["columns"]) == len(expected["columns"])
+    assert actual["rows"] == expected["rows"]
+    assert actual["truncated"] is False
